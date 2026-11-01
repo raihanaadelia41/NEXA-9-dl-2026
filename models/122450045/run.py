@@ -1,0 +1,1 @@
+# Script run model individu
