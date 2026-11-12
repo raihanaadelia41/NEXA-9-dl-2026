@@ -3,3 +3,8 @@
   "berkas": ["data/latih.csv"],
   "catatan": "Isi pada Sprint 0: versi/tanggal unduh, jumlah baris, dan perubahan (bila ada). Berkas data sendiri tidak di-commit."
 }
+{
+    "sesi": "Tim 9 - Arah Gerak 12 Nov 2026",
+    "tanggal": "2026-11-12",
+    "data_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+}
