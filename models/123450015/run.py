@@ -23,26 +23,85 @@ JALUR = "tl"                                   # cnn | tl | rnn | trf | ae
 def latih_dan_prediksi(seed: int, final: bool) -> tuple[np.ndarray, np.ndarray | None]:
     """Kembalikan (pred_val, pred_test|None). Ganti isi fungsi ini dengan model Anda."""
     import torch
+    import torchvision.models as models
 
     torch.manual_seed(seed)
     np.random.seed(seed)
+    
+    # Konfigurasi perangkat (GPU jika ada, sebaliknya CPU)
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
     Xtr, ytr, Xva, _, Xte, _ = data.muat()
-    # ---- MODEL (contoh minimal; ganti dengan arsitektur jalur Anda) ----
-    def ke_tensor(X):
-        return torch.tensor(np.asarray(X, dtype=np.float32)).reshape(len(X), -1)
-    X, y = ke_tensor(Xtr), torch.tensor(np.asarray(ytr))
-    model = torch.nn.Sequential(torch.nn.Linear(X.shape[1], 10))
-    opt = torch.optim.SGD(model.parameters(), lr=0.01)       # tulis alasan pilihan optimizer di catatan.md
-    for _ in range(2):
-        for i in range(0, len(X), 128):
+    
+    # ---- PENYESUAIAN TENSOR UNTUK RESNET ----
+    def ke_tensor_gambar(X):
+        # ResNet membutuhkan input berbentuk (Batch, Channels, Height, Width).
+        # Jika output data.muat() bentuknya (Batch, Height, Width, Channels), 
+        # kamu perlu melakukan permute: X_tensor = X_tensor.permute(0, 3, 1, 2)
+        X_tensor = torch.tensor(np.asarray(X, dtype=np.float32))
+        
+        # Hapus bagian .reshape(len(X), -1) karena ResNet butuh matriks 2D/3D utuh, bukan data pipih (flatten).
+        return X_tensor
+
+    X = ke_tensor_gambar(Xtr).to(device)
+    y = torch.tensor(np.asarray(ytr)).to(device)
+
+    # ---- MODEL TRANSFER LEARNING (RESNET) ----
+    # 1. Muat ResNet pre-trained (misal ResNet18)
+    model = models.resnet18(weights=models.ResNet18_Weights.DEFAULT)
+
+    # 2. Bekukan parameter backbone agar tidak ikut dilatih (Freeze)
+    for param in model.parameters():
+        param.requires_grad = False
+
+    # 3. Ganti lapisan Fully Connected (fc) terakhir sesuai datasetmu
+    num_ftrs = model.fc.in_features
+    jumlah_kelas = 10 # UBAH ANGKA INI SESUAI JUMLAH KELAS PADA DATASETMU
+    model.fc = torch.nn.Linear(num_ftrs, jumlah_kelas)
+    
+    model = model.to(device)
+
+    # Hanya parameter di layer fc baru yang dimasukkan ke optimizer
+    opt = torch.optim.SGD(model.fc.parameters(), lr=0.01)
+    
+    # ---- SIKLUS PELATIHAN (TRAINING LOOP) ----
+    epochs = 10
+    batch_size = 128
+    
+    model.train()
+    for _ in range(epochs):
+        for i in range(0, len(X), batch_size):
+            X_batch = X[i:i + batch_size]
+            y_batch = y[i:i + batch_size]
+            
             opt.zero_grad()
-            loss = torch.nn.functional.cross_entropy(model(X[i:i + 128]), y[i:i + 128])
+            pred = model(X_batch)
+            loss = torch.nn.functional.cross_entropy(pred, y_batch)
             loss.backward()
             opt.step()
+
+    # ---- EVALUASI (PREDIKSI) ----
     model.eval()
     with torch.no_grad():
-        pred_val = model(ke_tensor(Xva)).argmax(1).numpy()
-        pred_test = model(ke_tensor(Xte)).argmax(1).numpy() if final and Xte is not None else None
+        # Memproses validasi dalam batch agar memori tidak penuh jika data besar
+        Xva_tensor = ke_tensor_gambar(Xva).to(device)
+        pred_val_list = []
+        for i in range(0, len(Xva_tensor), batch_size):
+            batch_pred = model(Xva_tensor[i:i + batch_size]).argmax(1).cpu().numpy()
+            pred_val_list.append(batch_pred)
+        pred_val = np.concatenate(pred_val_list)
+
+        # Proses data uji
+        if final and Xte is not None:
+            Xte_tensor = ke_tensor_gambar(Xte).to(device)
+            pred_test_list = []
+            for i in range(0, len(Xte_tensor), batch_size):
+                batch_pred = model(Xte_tensor[i:i + batch_size]).argmax(1).cpu().numpy()
+                pred_test_list.append(batch_pred)
+            pred_test = np.concatenate(pred_test_list)
+        else:
+            pred_test = None
+
     return pred_val, pred_test
 
 
@@ -52,17 +111,22 @@ def main() -> None:
     ap.add_argument("--final", action="store_true", help="sprint terakhir: evaluasi data uji sekali")
     ap.add_argument("--perangkat", default="cpu laptop")
     a = ap.parse_args()
+    
     t0 = time.time()
     pred_val, pred_test = latih_dan_prediksi(a.seed, a.final)
     durasi = time.time() - t0
+    
     out = AKAR / "results" / NIM
     out.mkdir(parents=True, exist_ok=True)
+    
     np.save(out / "pred_val.npy", np.asarray(pred_val))
     perintah = [sys.executable, "-m", "src.common.evaluate", "--nim", NIM, "--model", JALUR, "--seed", str(a.seed),
                 "--pred-val", str(out / "pred_val.npy"), "--durasi", f"{durasi:.1f}", "--perangkat", a.perangkat]
+    
     if pred_test is not None:
         np.save(out / "pred_test.npy", np.asarray(pred_test))
         perintah += ["--pred-test", str(out / "pred_test.npy")]
+        
     subprocess.run(perintah, check=True, cwd=AKAR)
 
 
