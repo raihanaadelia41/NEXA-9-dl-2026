@@ -1,10 +1,31 @@
-# dataset kasus tim tidak di-commit; hanya manifesnya
+# Data
 data/*
+
+# Izinkan folder hasil preprocessing
+!data/processed/
+
+# Izinkan file CSV hasil preprocessing
+!data/processed/**/*.csv
+
+# Abaikan video overlay
+data/processed/**/*.mp4
+data/processed/**/*_overlay.*
+
+# Abaikan video raw
+data/raw/
+
+# Manifest
 !data/MANIFEST.json
+
+# Model checkpoints
 *.pt
 *.pth
 *.ckpt
+
+# Python cache
 __pycache__/
 .ipynb_checkpoints/
+
+# Virtual environment
 .venv/
-# prediksi boleh di-commit (kecil); checkpoint model tidak
+
