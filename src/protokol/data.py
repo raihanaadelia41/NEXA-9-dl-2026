@@ -17,12 +17,12 @@ Contoh lengkap: ``contoh_fashion_mnist.py`` di folder ini.
 from __future__ import annotations
 
 import numpy as np
-
+import pandas as pd
 from src.common import manifest, split
 
 TUGAS = "klasifikasi"
 
-
+'''
 def muat():
     """Ganti isi fungsi ini dengan pemuat dataset kasus tim Anda."""
     m = manifest.baca()
@@ -36,3 +36,27 @@ def muat():
     # tr, va = split.indeks(len(X))               # atau split.indeks_urut(len(X)) untuk deret waktu
     # uji = pd.read_csv(manifest.AKAR / "data" / "uji.csv")   # bila ada
     # return X[tr], y[tr], X[va], y[va], X_uji, y_uji
+'''
+# Aisyah edit
+def muat(data_dir="data", test_participants=["P05", "P06"]):
+    """
+    Pemotong jendela (windowing) yang memuat data meja.
+    Aturan:
+    - Membuang 1 detik pertama dari setiap kondisi.
+    - Pemisahan data uji berdasarkan partisipan.
+    """
+    print(f"Memuat label dan sensor dari {data_dir}...")
+    
+    # Logika buang 1 detik pertama:
+    # df = df[df['t_host'] > df['t_start'] + 1.0]
+    
+    # Logika pisah per partisipan:
+    # train_df = df[~df['partisipan'].isin(test_participants)]
+    # test_df = df[df['partisipan'].isin(test_participants)]
+    
+    # Dummy return (X: Pose+PIR+Pintu, y: 6 lintasan)
+    X_train, y_train = np.random.rand(100, 10, 32), np.random.randint(0, 6, 100)
+    X_val, y_val = np.random.rand(20, 10, 32), np.random.randint(0, 6, 20)
+    X_test, y_test = np.random.rand(20, 10, 32), np.random.randint(0, 6, 20)
+    
+    return X_train, y_train, X_val, y_val, X_test, y_test
