@@ -1,6 +1,12 @@
-"""Kerangka run.py anggota. Salin folder ini menjadi models/<nim>/ lalu isi bagian MODEL.
+"""Transfer Learning (ResNet-18) untuk klasifikasi 6 lintasan arah gerak.
 
-    python models/<nim>/run.py --seed 1 [--final]
+Masukan model : urutan pose + PIR + sensor pintu  →  shape (N, 10, 32)
+Pemetaan ke citra: (N, 10, 32) → 3-channel 64×64 agar cocok dengan ResNet-18.
+Strategi TL    : bekukan semua layer kecuali fc terakhir (fine-tune hanya head).
+
+Jalankan:
+    python models/123450015/run.py --seed 1
+    python models/123450015/run.py --seed 1 --final    # sprint terakhir, sekali
 """
 from __future__ import annotations
 
@@ -14,119 +20,162 @@ import numpy as np
 
 AKAR = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(AKAR))
-from src.protokol import data  # noqa: E402  (protokol tim yang dibekukan)
+from src.protokol import data  
 
-NIM = Path(__file__).resolve().parent.name     # nama folder = NIM
-JALUR = "tl"                                   # cnn | tl | rnn | trf | ae
+NIM   = Path(__file__).resolve().parent.name   # otomatis: 123450015
+JALUR = "tl"                                   # jalur Transfer Learning
 
 
-def latih_dan_prediksi(seed: int, final: bool) -> tuple[np.ndarray, np.ndarray | None]:
-    """Kembalikan (pred_val, pred_test|None). Ganti isi fungsi ini dengan model Anda."""
+# Konversi sekuens → citra 3-channel untuk ResNet
+
+def _ke_citra(X: np.ndarray, ukuran: int = 64) -> "torch.Tensor":
+    """(N, T, F) → (N, 3, ukuran, ukuran) — normalisasi min-max per sampel."""
     import torch
-    import torchvision.models as models
+    import torch.nn.functional as F
 
-    torch.manual_seed(seed)
-    np.random.seed(seed)
-    
-    # Konfigurasi perangkat (GPU jika ada, sebaliknya CPU)
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    arr = np.nan_to_num(np.asarray(X, dtype=np.float32), nan=0.0)
+    # Normalisasi per-sampel ke [0, 1]
+    mn = arr.min(axis=(1, 2), keepdims=True)
+    mx = arr.max(axis=(1, 2), keepdims=True)
+    arr = np.where(mx > mn, (arr - mn) / (mx - mn + 1e-8), arr)
 
-    Xtr, ytr, Xva, _, Xte, _ = data.muat()
-    
-    # ---- PENYESUAIAN TENSOR UNTUK RESNET ----
-    def ke_tensor_gambar(X):
-        # ResNet membutuhkan input berbentuk (Batch, Channels, Height, Width).
-        # Jika output data.muat() bentuknya (Batch, Height, Width, Channels), 
-        # kamu perlu melakukan permute: X_tensor = X_tensor.permute(0, 3, 1, 2)
-        X_tensor = torch.tensor(np.asarray(X, dtype=np.float32))
-        
-        # Hapus bagian .reshape(len(X), -1) karena ResNet butuh matriks 2D/3D utuh, bukan data pipih (flatten).
-        return X_tensor
+    # (N, T, F) → (N, 1, T, F) → resize → (N, 1, ukuran, ukuran)
+    t = torch.tensor(arr).unsqueeze(1)                      # (N, 1, T, F)
+    t = F.interpolate(t, size=(ukuran, ukuran),
+                      mode="bilinear", align_corners=False)  # (N, 1, 64, 64)
+    t = t.repeat(1, 3, 1, 1)                                # (N, 3, 64, 64)
+    return t
 
-    X = ke_tensor_gambar(Xtr).to(device)
-    y = torch.tensor(np.asarray(ytr)).to(device)
 
-    # ---- MODEL TRANSFER LEARNING (RESNET) ----
-    # 1. Muat ResNet pre-trained (misal ResNet18)
-    model = models.resnet18(weights=models.ResNet18_Weights.DEFAULT)
+# Model: ResNet-18 pretrained, hanya fc yang dilatih
 
-    # 2. Bekukan parameter backbone agar tidak ikut dilatih (Freeze)
+def _bangun_model(jumlah_kelas: int) -> "torch.nn.Module":
+    """ResNet-18 dengan fc head diganti sesuai jumlah kelas."""
+    import torchvision.models as tv
+
+    model = tv.resnet18(weights=tv.ResNet18_Weights.DEFAULT)
+
+    # Bekukan semua layer backbone
     for param in model.parameters():
         param.requires_grad = False
 
-    # 3. Ganti lapisan Fully Connected (fc) terakhir sesuai datasetmu
-    num_ftrs = model.fc.in_features
-    jumlah_kelas = 10 # UBAH ANGKA INI SESUAI JUMLAH KELAS PADA DATASETMU
-    model.fc = torch.nn.Linear(num_ftrs, jumlah_kelas)
-    
-    model = model.to(device)
+    # Ganti head → trainable
+    in_features = model.fc.in_features
+    model.fc = __import__("torch").nn.Linear(in_features, jumlah_kelas)
+    # model.fc sudah requires_grad=True secara bawaan
 
-    # Hanya parameter di layer fc baru yang dimasukkan ke optimizer
-    opt = torch.optim.SGD(model.fc.parameters(), lr=0.01)
-    
-    # ---- SIKLUS PELATIHAN (TRAINING LOOP) ----
-    epochs = 10
-    batch_size = 128
-    
+    return model
+
+
+# Latih & prediksi
+
+def latih_dan_prediksi(
+    seed: int, final: bool
+) -> tuple[np.ndarray, np.ndarray | None]:
+    """Kembalikan (pred_val, pred_test|None)."""
+    import torch
+    import torch.nn.functional as F
+
+    torch.manual_seed(seed)
+    np.random.seed(seed)
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    print(f"[TL-ResNet18] perangkat={device}, seed={seed}")
+
+    # 1. Muat data protokol tim
+    X_tr, y_tr, X_va, y_va, X_te, y_te = data.muat()
+
+    # 2. Konversi ke tensor citra
+    Xtr = _ke_citra(X_tr).to(device)
+    ytr = torch.tensor(np.asarray(y_tr, dtype=np.int64)).to(device)
+    Xva = _ke_citra(X_va).to(device)
+
+    jumlah_kelas = int(len(np.unique(np.asarray(y_tr))))
+    print(f"  jumlah kelas={jumlah_kelas}, "
+          f"n_train={len(Xtr)}, n_val={len(Xva)}")
+
+    # 3. Bangun model ResNet-18 (TL)
+    model = _bangun_model(jumlah_kelas).to(device)
+
+    # 4. Latih hanya fc head
+    opt    = torch.optim.Adam(model.fc.parameters(), lr=1e-3, weight_decay=1e-4)
+    sched  = torch.optim.lr_scheduler.StepLR(opt, step_size=5, gamma=0.5)
+    EPOCHS = 20
+    BATCH  = 32
+
     model.train()
-    for _ in range(epochs):
-        for i in range(0, len(X), batch_size):
-            X_batch = X[i:i + batch_size]
-            y_batch = y[i:i + batch_size]
-            
+    for ep in range(1, EPOCHS + 1):
+        perm = torch.randperm(len(Xtr), device=device)
+        ep_loss = 0.0
+        for i in range(0, len(Xtr), BATCH):
+            idx = perm[i: i + BATCH]
             opt.zero_grad()
-            pred = model(X_batch)
-            loss = torch.nn.functional.cross_entropy(pred, y_batch)
+            logit = model(Xtr[idx])
+            loss  = F.cross_entropy(logit, ytr[idx])
             loss.backward()
             opt.step()
+            ep_loss += loss.item() * len(idx)
+        sched.step()
+        if ep % 5 == 0 or ep == 1:
+            print(f"  epoch {ep:3d}/{EPOCHS}  loss={ep_loss / len(Xtr):.4f}")
 
-    # ---- EVALUASI (PREDIKSI) ----
+    # 5. Prediksi
     model.eval()
     with torch.no_grad():
-        # Memproses validasi dalam batch agar memori tidak penuh jika data besar
-        Xva_tensor = ke_tensor_gambar(Xva).to(device)
-        pred_val_list = []
-        for i in range(0, len(Xva_tensor), batch_size):
-            batch_pred = model(Xva_tensor[i:i + batch_size]).argmax(1).cpu().numpy()
-            pred_val_list.append(batch_pred)
-        pred_val = np.concatenate(pred_val_list)
+        pred_val_parts = []
+        for i in range(0, len(Xva), BATCH):
+            logit = model(Xva[i: i + BATCH])
+            pred_val_parts.append(logit.argmax(1).cpu().numpy())
+        pred_val = np.concatenate(pred_val_parts)
 
-        # Proses data uji
-        if final and Xte is not None:
-            Xte_tensor = ke_tensor_gambar(Xte).to(device)
-            pred_test_list = []
-            for i in range(0, len(Xte_tensor), batch_size):
-                batch_pred = model(Xte_tensor[i:i + batch_size]).argmax(1).cpu().numpy()
-                pred_test_list.append(batch_pred)
-            pred_test = np.concatenate(pred_test_list)
-        else:
-            pred_test = None
+        pred_test: np.ndarray | None = None
+        if final and X_te is not None:
+            Xte = _ke_citra(X_te).to(device)
+            pred_test_parts = []
+            for i in range(0, len(Xte), BATCH):
+                logit = model(Xte[i: i + BATCH])
+                pred_test_parts.append(logit.argmax(1).cpu().numpy())
+            pred_test = np.concatenate(pred_test_parts)
 
     return pred_val, pred_test
 
 
+
+# Entry point
+
 def main() -> None:
-    ap = argparse.ArgumentParser()
-    ap.add_argument("--seed", type=int, required=True)
-    ap.add_argument("--final", action="store_true", help="sprint terakhir: evaluasi data uji sekali")
-    ap.add_argument("--perangkat", default="cpu laptop")
+    ap = argparse.ArgumentParser(description=__doc__,
+                                 formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument("--seed",      type=int, required=True,
+                    help="seed pengacakan (mis. 1, 2, 3)")
+    ap.add_argument("--final",     action="store_true",
+                    help="sprint terakhir: evaluasi data uji sekali")
+    ap.add_argument("--perangkat", default="cpu laptop",
+                    help="label perangkat (mis. 'RTX 3060 laptop')")
     a = ap.parse_args()
-    
+
     t0 = time.time()
     pred_val, pred_test = latih_dan_prediksi(a.seed, a.final)
     durasi = time.time() - t0
-    
+
+    # Simpan prediksi
     out = AKAR / "results" / NIM
     out.mkdir(parents=True, exist_ok=True)
-    
     np.save(out / "pred_val.npy", np.asarray(pred_val))
-    perintah = [sys.executable, "-m", "src.common.evaluate", "--nim", NIM, "--model", JALUR, "--seed", str(a.seed),
-                "--pred-val", str(out / "pred_val.npy"), "--durasi", f"{durasi:.1f}", "--perangkat", a.perangkat]
-    
+
+    # Panggil evaluator tim (src.common.evaluate)
+    perintah = [
+        sys.executable, "-m", "src.common.evaluate",
+        "--nim",        NIM,
+        "--model",      JALUR,
+        "--seed",       str(a.seed),
+        "--pred-val",   str(out / "pred_val.npy"),
+        "--durasi",     f"{durasi:.1f}",
+        "--perangkat",  a.perangkat,
+    ]
     if pred_test is not None:
         np.save(out / "pred_test.npy", np.asarray(pred_test))
         perintah += ["--pred-test", str(out / "pred_test.npy")]
-        
+
     subprocess.run(perintah, check=True, cwd=AKAR)
 
 

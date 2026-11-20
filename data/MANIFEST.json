@@ -1,10 +1,12 @@
 {
-  "sumber": "https://… (tautan dataset dari kartu Kasus tim di Workbench)",
-  "berkas": ["data/latih.csv"],
-  "catatan": "Isi pada Sprint 0: versi/tanggal unduh, jumlah baris, dan perubahan (bila ada). Berkas data sendiri tidak di-commit."
-}
-{
-    "sesi": "Tim 9 - Arah Gerak 12 Nov 2026",
-    "tanggal": "2026-11-12",
-    "data_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  "sumber": "data simulasi tim 9 — Arah Gerak Keluar-Masuk di Depan Meja (rekam web 2026-11-17)",
+  "berkas": [
+    "data/processed/pose/P01/P01_block01_pose.csv",
+    "data/processed/pose/P02/P02_block02_pose.csv",
+    "data/processed/pose/P03/P03_block03_pose.csv",
+    "data/processed/pose/P04/P04_block04_pose.csv",
+    "data/processed/pose/P05/P05_block05_pose.csv",
+    "data/processed/pose/P06/P06_block06_pose.csv"
+  ],
+  "catatan": "Sprint 0 — data simulasi (src/protokol/data.py mengembalikan array acak). Diperbarui saat data meja tiba (target 12 Nov 2026). Sesi: Tim 9 - Arah Gerak, tanggal rekam: 2026-11-17."
 }
