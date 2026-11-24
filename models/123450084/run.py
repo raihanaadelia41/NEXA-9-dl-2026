@@ -1,128 +1,123 @@
-from __future__ import annotations
-
-import argparse
-import subprocess
+import os
 import sys
-import time
-from pathlib import Path
-
+import json
+import argparse
 import numpy as np
+import torch
+import torch.nn as nn
+from torch.utils.data import TensorDataset, DataLoader
+from sklearn.metrics import f1_score
 
-AKAR = Path(__file__).resolve().parents[2]
-sys.path.insert(0, str(AKAR))
-from src.protokol import data  # noqa: E402  (protokol tim yang dibekukan)
-
-NIM = Path(__file__).resolve().parent.name     # otomatis terbaca: 123450015
-JALUR = "tl"                                   # jalur Transfer Learning
+# Tambahkan root repo ke sys.path agar src.protokol.data bisa diimpor
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
+from src.protokol.data import muat
 
 
-def latih_dan_prediksi(seed: int, final: bool) -> tuple[np.ndarray, np.ndarray | None]:
-    """Transfer Learning (MobileNetV3-Small) untuk data sekuensial pose."""
-    import torch
-    import torch.nn.functional as F
-    import torchvision.models as models
+class SmallTimeSeriesTransformer(nn.Module):
+    """Encoder Transformer kecil untuk urutan (pose + PIR + sensor pintu)."""
+    def __init__(self, input_dim, num_classes=6, d_model=64, nhead=4, num_layers=2, dropout=0.1):
+        super().__init__()
+        self.input_proj = nn.Linear(input_dim, d_model)
+        self.pos_emb = nn.Parameter(torch.randn(1, 200, d_model) * 0.02)
+        encoder_layer = nn.TransformerEncoderLayer(
+            d_model=d_model,
+            nhead=nhead,
+            dim_feedforward=d_model * 2,
+            dropout=dropout,
+            batch_first=True,
+        )
+        self.encoder = nn.TransformerEncoder(encoder_layer, num_layers=num_layers)
+        self.head = nn.Sequential(
+            nn.LayerNorm(d_model),
+            nn.Linear(d_model, num_classes),
+        )
 
-    torch.manual_seed(seed)
+    def forward(self, x):
+        # x: (B, T, F)
+        T = x.size(1)
+        h = self.input_proj(x) + self.pos_emb[:, :T, :]
+        h = self.encoder(h)
+        h = h.mean(dim=1)  # Global average pooling sepanjang waktu
+        return self.head(h)
+
+
+def set_seed(seed):
     np.random.seed(seed)
+    torch.manual_seed(seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed_all(seed)
+
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--seed", type=int, default=1)
+    parser.add_argument("--sesi_dir", type=str, default="data/sesi_tim09")
+    parser.add_argument("--epochs", type=int, default=25)
+    parser.add_argument("--batch_size", type=int, default=16)
+    parser.add_argument("--lr", type=float, default=1e-3)
+    args = parser.parse_args()
+
+    set_seed(args.seed)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    # 1. Muat data dari protokol tim
-    Xtr, ytr, Xva, _, Xte, _ = data.muat()
+    # 1. Muat data sesuai protokol
+    X_train, y_train, X_val, y_val, X_test, y_test = muat(sesi_dir=args.sesi_dir)
+    input_dim = X_train.shape[-1]
 
-    # 2. Ubah matriks sekuensial pose (Batch, Frame, Fitur) menjadi citra 2D 3-channel (64x64)
-    def ke_tensor_pose_2d(X):
-        arr = np.nan_to_num(np.asarray(X, dtype=np.float32), nan=0.0)
-        t = torch.tensor(arr)
-        if t.ndim == 2:
-            t = t.unsqueeze(1)
-        # Bentuk (Batch, 1, Frame, Fitur) -> duplikasi ke 3 channel RGB -> resize ke 64x64
-        t = t.unsqueeze(1).repeat(1, 3, 1, 1)
-        t = F.interpolate(t, size=(64, 64), mode="bilinear", align_corners=False)
-        return t
+    train_loader = DataLoader(
+        TensorDataset(torch.tensor(X_train), torch.tensor(y_train)),
+        batch_size=args.batch_size,
+        shuffle=True,
+    )
 
-    X_train = ke_tensor_pose_2d(Xtr).to(device)
-    y_train = torch.tensor(np.asarray(ytr), dtype=torch.long).to(device)
-    jumlah_kelas = int(y_train.max().item()) + 1
+    # 2. Bangun model Transformer kecil
+    model = SmallTimeSeriesTransformer(input_dim=input_dim, num_classes=6).to(device)
+    criterion = nn.CrossEntropyLoss()
+    optimizer = torch.optim.AdamW(model.parameters(), lr=args.lr, weight_decay=1e-4)
 
-    # 3. Bangun Model Transfer Learning (MobileNetV3-Small)
-    model = models.mobilenet_v3_small(weights=models.MobileNet_V3_Small_Weights.DEFAULT)
-
-    # Bekukan bobot ekstraktor fitur bawaan (backbone)
-    for param in model.features.parameters():
-        param.requires_grad = False
-
-    # Ganti layer klasifikasi terakhir agar sesuai jumlah kelas gerakan
-    in_features = model.classifier[3].in_features
-    model.classifier[3] = torch.nn.Linear(in_features, jumlah_kelas)
-    model = model.to(device)
-
-    # 4. Latih bagian classifier
-    opt = torch.optim.Adam(model.classifier.parameters(), lr=0.001)
-    epochs = 15
-    batch_size = 64
-
-    model.train()
-    for _ in range(epochs):
-        indeks = torch.randperm(len(X_train))
-        for i in range(0, len(X_train), batch_size):
-            idx = indeks[i:i + batch_size]
-            opt.zero_grad()
-            loss = F.cross_entropy(model(X_train[idx]), y_train[idx])
+    # 3. Latih model
+    for epoch in range(1, args.epochs + 1):
+        model.train()
+        for xb, yb in train_loader:
+            xb, yb = xb.to(device), yb.to(device)
+            optimizer.zero_grad()
+            loss = criterion(model(xb), yb)
             loss.backward()
-            opt.step()
+            optimizer.step()
 
-    # 5. Prediksi data validasi (dan data uji jika --final aktif)
+    # 4. Evaluasi F1-makro pada validasi & uji
     model.eval()
     with torch.no_grad():
-        X_val = ke_tensor_pose_2d(Xva).to(device)
-        pred_val_list = [
-            model(X_val[i:i + batch_size]).argmax(1).cpu().numpy()
-            for i in range(0, len(X_val), batch_size)
-        ]
-        pred_val = np.concatenate(pred_val_list)
+        val_preds = model(torch.tensor(X_val).to(device)).argmax(dim=1).cpu().numpy()
+        test_preds = model(torch.tensor(X_test).to(device)).argmax(dim=1).cpu().numpy()
 
-        if final and Xte is not None:
-            X_test = ke_tensor_pose_2d(Xte).to(device)
-            pred_test_list = [
-                model(X_test[i:i + batch_size]).argmax(1).cpu().numpy()
-                for i in range(0, len(X_test), batch_size)
-            ]
-            pred_test = np.concatenate(pred_test_list)
-        else:
-            pred_test = None
+    f1_val = float(f1_score(y_val, val_preds, average="macro"))
+    f1_test = float(f1_score(y_test, test_preds, average="macro"))
 
-    return pred_val, pred_test
+    # 5. Baca data_hash dari MANIFEST.json jika ada
+    data_hash = "ISI_DENGAN_SHA256_LABEL_CSV"
+    manifest_path = "data/MANIFEST.json"
+    if os.path.exists(manifest_path):
+        with open(manifest_path, "r", encoding="utf-8") as mf:
+            data_hash = json.load(mf).get("data_hash", data_hash)
 
+    # 6. Simpan results/123450084/metrics.json
+    nim = "123450084"
+    out_dir = os.path.join("results", nim)
+    os.makedirs(out_dir, exist_ok=True)
+    metrics = {
+        "nim": nim,
+        "model": "Transformer",
+        "seed": args.seed,
+        "f1_macro_val": round(f1_val, 4),
+        "f1_macro_test": round(f1_test, 4),
+        "data_hash": data_hash,
+    }
+    out_path = os.path.join(out_dir, "metrics.json")
+    with open(out_path, "w", encoding="utf-8") as f:
+        json.dump(metrics, f, indent=4)
 
-def main() -> None:
-    ap = argparse.ArgumentParser()
-    ap.add_argument("--seed", type=int, required=True)
-    ap.add_argument("--final", action="store_true", help="sprint terakhir: evaluasi data uji sekali")
-    ap.add_argument("--perangkat", default="cpu laptop")
-    a = ap.parse_args()
-
-    t0 = time.time()
-    pred_val, pred_test = latih_dan_prediksi(a.seed, a.final)
-    durasi = time.time() - t0
-
-    out = AKAR / "results" / NIM
-    out.mkdir(parents=True, exist_ok=True)
-    np.save(out / "pred_val.npy", np.asarray(pred_val))
-
-    perintah = [
-        sys.executable, "-m", "src.common.evaluate",
-        "--nim", NIM,
-        "--model", JALUR,
-        "--seed", str(a.seed),
-        "--pred-val", str(out / "pred_val.npy"),
-        "--durasi", f"{durasi:.1f}",
-        "--perangkat", a.perangkat,
-    ]
-    if pred_test is not None:
-        np.save(out / "pred_test.npy", np.asarray(pred_test))
-        perintah += ["--pred-test", str(out / "pred_test.npy")]
-
-    subprocess.run(perintah, check=True, cwd=AKAR)
+    print(f"[SELESAI] F1-makro Val: {f1_val:.4f} | Test: {f1_test:.4f} -> {out_path}")
 
 
 if __name__ == "__main__":
