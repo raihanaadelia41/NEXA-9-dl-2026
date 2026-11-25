@@ -1,5 +1,8 @@
 {
   "sumber": "data simulasi tim 9 — Arah Gerak Keluar-Masuk di Depan Meja (rekam web 2026-11-17)",
+  "sesi": "tim09_web-20261117-171532-679f",
+  "arsip": "tim09_web-20261117-171532-679f.tar",
+  "tanggal": "2026-11-17",
   "berkas": [
     "data/processed/pose/P01/P01_block01_pose.csv",
     "data/processed/pose/P02/P02_block02_pose.csv",
@@ -8,5 +11,6 @@
     "data/processed/pose/P05/P05_block05_pose.csv",
     "data/processed/pose/P06/P06_block06_pose.csv"
   ],
-  "catatan": "Sprint 0 — data simulasi (src/protokol/data.py mengembalikan array acak). Diperbarui saat data meja tiba (target 12 Nov 2026). Sesi: Tim 9 - Arah Gerak, tanggal rekam: 2026-11-17."
+  "catatan": "Sprint 0 — data simulasi (src/protokol/data.py mengembalikan array acak). Diperbarui saat data meja tiba (target 12 Nov 2026). Sesi: Tim 9 - Arah Gerak, tanggal rekam: 2026-11-17.",
+  "data_hash": "2b0c65b7fa8422037dd4d62af43430911de378ec7b85432504dd320a26915a41"
 }
