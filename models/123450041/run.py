@@ -161,7 +161,7 @@ def latih_dan_prediksi(
     # Device
     # --------------------------------------------------------
 
-    if perangkat == "auto":
+    if perangkat == "cpu laptop":
         device = torch.device(
             "cuda" if torch.cuda.is_available() else "cpu"
         )
