@@ -6,7 +6,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 from torch.utils.data import TensorDataset, DataLoader
-from sklearn.metrics import f1_score
+from sklearn.metrics import f1_score, accuracy_score
 
 # Tambahkan root repo ke sys.path agar src.protokol.data bisa diimpor
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
@@ -110,16 +110,18 @@ def main():
         "nim": nim,
         "model": "Transformer",
         "seed": args.seed,
-        "f1_macro_val": round(f1_val, 4),
-        "f1_macro_test": round(f1_test, 4),
+        "metrik": {
+            "val_acc": round(float(val_acc), 4),
+            "val_macro_f1": round(float(f1_val), 4),
+            "test_macro_f1": round(float(f1_test), 4),
+        },
         "data_hash": data_hash,
     }
     out_path = os.path.join(out_dir, "metrics.json")
     with open(out_path, "w", encoding="utf-8") as f:
         json.dump(metrics, f, indent=4)
 
-    print(f"[SELESAI] F1-makro Val: {f1_val:.4f} | Test: {f1_test:.4f} -> {out_path}")
-
+    print(f"[SELESAI] Val Acc: {val_acc:.4f} | F1-makro Val: {f1_val:.4f} | Test: {f1_test:.4f} -> {out_path}")
 
 if __name__ == "__main__":
     main()
