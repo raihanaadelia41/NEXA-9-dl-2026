@@ -94,6 +94,7 @@ def main():
 
     f1_val = float(f1_score(y_val, val_preds, average="macro"))
     f1_test = float(f1_score(y_test, test_preds, average="macro"))
+    val_acc = (y_val == val_preds).mean()
 
     # 5. Baca data_hash dari MANIFEST.json jika ada
     data_hash = "ISI_DENGAN_SHA256_LABEL_CSV"
