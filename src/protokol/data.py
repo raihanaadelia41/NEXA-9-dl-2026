@@ -3,6 +3,7 @@ import numpy as np
 import pandas as pd
 
 SEQ_LEN = 70  # 7 detik setelah buang 1 detik awal (@ 10 fps)
+TUGAS = "klasifikasi"
 
 def _resample_window(arr, target_len=SEQ_LEN):
     if len(arr) == 0:
@@ -29,7 +30,7 @@ def _data_simulasi(seq_len=SEQ_LEN, n_features=34, seed=1009):
     X_val, y_val = X[72:90], y[72:90]
     X_test, y_test = X[90:], y[90:]
     X_train, X_val, X_test = _normalisasi_fit_transform(X_train, X_val, X_test)
-    return (X_train, X_val, X_test), (y_train, y_val, y_test)
+    return X_train, y_train, X_val, y_val, X_test, y_test
 
 def muat(sesi_dir="data/sesi_tim09", seq_len=SEQ_LEN):
     label_path = os.path.join(sesi_dir, "label.csv")
@@ -99,7 +100,7 @@ def muat(sesi_dir="data/sesi_tim09", seq_len=SEQ_LEN):
 
     X_train, X_val, X_test = _normalisasi_fit_transform(X_train, X_val, X_test)
     print(f"[OK] Train: {X_train.shape}, Val: {X_val.shape}, Test: {X_test.shape} | Kelas: {kelas_unik}")
-    return (X_train, X_val, X_test), (y_train, y_val, y_test)
+    return X_train, y_train, X_val, y_val, X_test, y_test
 
 """Pemuat data kasus Tim 9 — pose, PIR, dan sensor pintu."""
 '''
