@@ -61,8 +61,8 @@ def main():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     # 1. Muat data sesuai protokol
-    (X_train, X_val, X_test), (y_train, y_val, y_test) = muat(sesi_dir=args.sesi_dir)
-    # X_train, y_train, X_val, y_val, X_test, y_test = muat(sesi_dir=args.sesi_dir)
+    # (X_train, X_val, X_test), (y_train, y_val, y_test) = muat(sesi_dir=args.sesi_dir)
+    X_train, y_train, X_val, y_val, X_test, y_test = muat(sesi_dir=args.sesi_dir)
     input_dim = X_train.shape[-1]
 
     train_loader = DataLoader(
