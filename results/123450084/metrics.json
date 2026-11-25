@@ -1,0 +1,8 @@
+{
+    "nim": "123450084",
+    "model": "Transformer",
+    "seed": 1,
+    "f1_macro_val": 0.1806,
+    "f1_macro_test": 0.0833,
+    "data_hash": "2b0c65b7fa8422037dd4d62af43430911de378ec7b85432504dd320a26915a41"
+}
