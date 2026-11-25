@@ -2,6 +2,7 @@
     "nim": "123450084",
     "model": "Transformer",
     "seed": 1,
-    "f1_macro_val": 0.88,
-    "data_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    "f1_macro_val": 0.1296,
+    "f1_macro_test": 0.1306,
+    "data_hash": "97aec2dbf142c54a57f2f722a8d0aa46"
 }
