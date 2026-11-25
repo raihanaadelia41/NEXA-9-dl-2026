@@ -1,13 +1,13 @@
 {
   "metrik": {
-    "val_acc": 0.2,
-    "val_macro_f1": 0.055556
+    "val_acc": 0.222222,
+    "val_macro_f1": 0.185185
   },
   "seed": 1,
-  "data_hash": "97aec2dbf142c54a57f2f722a8d0aa46",
+  "data_hash": "54437b452db63f6a159f84e04fce1283",
   "perangkat": "auto",
   "model": "cnn",
-  "n_val": 20,
+  "n_val": 18,
   "n_test": 0,
-  "durasi_detik": 8.9
+  "durasi_detik": 7.4
 }
