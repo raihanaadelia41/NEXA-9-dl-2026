@@ -29,3 +29,10 @@ __pycache__/
 # Virtual environment
 .venv/
 
+
+# Abaikan data besar
+# *.tar
+# *.tar.gz
+data/sesi_tim09/kamera/
+data/sesi_tim09/imu.csv
+data/sesi_tim09/daya.csv

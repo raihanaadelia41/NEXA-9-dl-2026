@@ -1,0 +1,43 @@
+{
+  "versi_perekam": "1.13",
+  "tim": 9,
+  "judul": "Arah gerak keluar-masuk di depan meja",
+  "simulasi": false,
+  "dibuat": "2026-11-17T17:34:48.504",
+  "host": "sditera-civ",
+  "python": "3.12.3",
+  "berkas": {
+    "aktuator.csv": {
+      "sha256": "af7ab65d74aef99261a1337b99c489304b54989c4d96697f2916a88fb2c33ca5",
+      "bytes": 15356
+    },
+    "daya.csv": {
+      "sha256": "a0186646e79a85cdbccf5157994af25a574c5c3a905b4f17aa36e11232e8c556",
+      "bytes": 9068631
+    },
+    "digital.csv": {
+      "sha256": "29a4113bb9b714ef297022123c0e24ef886428d81d39c7920c1f2d81e5ca25bd",
+      "bytes": 28
+    },
+    "imu.csv": {
+      "sha256": "6b6d4724078a07b3717dc6e2719a96755d524c886632cc2a26f2940dd3544a73",
+      "bytes": 23553048
+    },
+    "label.csv": {
+      "sha256": "2b0c65b7fa8422037dd4d62af43430911de378ec7b85432504dd320a26915a41",
+      "bytes": 10976
+    },
+    "lingkungan.csv": {
+      "sha256": "ef48f10a2803365942506988ee3572d66e4101f9b2e590481e11ebccc134ab93",
+      "bytes": 47983
+    },
+    "log.txt": {
+      "sha256": "0b089c5209bc8ea73be20cf3a45900fa24e4f9bc013b91b2c015f574c6074f09",
+      "bytes": 1953
+    },
+    "rencana.yaml": {
+      "sha256": "f34d3cbc41c58d5a55e9199c0acccab03225fed5d755c9a7a66c84c51d809fa3",
+      "bytes": 1018
+    }
+  }
+}
