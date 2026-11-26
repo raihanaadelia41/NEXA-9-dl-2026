@@ -399,7 +399,7 @@ def main() -> None:
         "--durasi",
         f"{durasi:.1f}",
         "--perangkat",
-        args.perangkat
+        "cpu laptop"
     ]
 
     if pred_test is not None:
