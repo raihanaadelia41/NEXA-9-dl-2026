@@ -1,6 +1,7 @@
 import os
 import sys
 import json
+import time
 import argparse
 import numpy as np
 import torch
@@ -49,6 +50,7 @@ def set_seed(seed):
 
 
 def main():
+    t_mulai = time.time()
     parser = argparse.ArgumentParser()
     parser.add_argument("--seed", type=int, default=1)
     parser.add_argument("--sesi_dir", type=str, default="data/sesi_tim09")
@@ -61,8 +63,7 @@ def main():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     # 1. Muat data sesuai protokol
-    # (X_train, X_val, X_test), (y_train, y_val, y_test) = muat(sesi_dir=args.sesi_dir)
-    X_train, y_train, X_val, y_val, X_test, y_test = muat(sesi_dir=args.sesi_dir)
+    (X_train, X_val, X_test), (y_train, y_val, y_test) = muat(sesi_dir=args.sesi_dir)
     input_dim = X_train.shape[-1]
 
     train_loader = DataLoader(
@@ -94,7 +95,7 @@ def main():
 
     f1_val = float(f1_score(y_val, val_preds, average="macro"))
     f1_test = float(f1_score(y_test, test_preds, average="macro"))
-    val_acc = (y_val == val_preds).mean()
+    val_acc = float(accuracy_score(y_val, val_preds))
 
     # 5. Baca data_hash dari MANIFEST.json jika ada
     data_hash = "ISI_DENGAN_SHA256_LABEL_CSV"
@@ -104,25 +105,33 @@ def main():
             data_hash = json.load(mf).get("data_hash", data_hash)
 
     # 6. Simpan results/123450084/metrics.json
+    durasi_detik = round(time.time() - t_mulai, 1)
+    perangkat = "cuda" if torch.cuda.is_available() else "cpu laptop"
+
     nim = "123450084"
     out_dir = os.path.join("results", nim)
     os.makedirs(out_dir, exist_ok=True)
+
     metrics = {
-        "nim": nim,
-        "model": "Transformer",
-        "seed": args.seed,
         "metrik": {
-            "val_acc": round(float(val_acc), 4),
-            "val_macro_f1": round(float(f1_val), 4),
-            "test_macro_f1": round(float(f1_test), 4),
+            "val_acc": round(val_acc, 6),
+            "val_macro_f1": round(f1_val, 6),
         },
+        "seed": args.seed,
         "data_hash": data_hash,
+        "perangkat": perangkat,
+        "model": "Transformer",  # ganti jadi "tl" kalau memang diminta kode "tl"
+        "n_val": int(len(y_val)),
+        "n_test": int(len(y_test)),
+        "durasi_detik": durasi_detik,
     }
+
     out_path = os.path.join(out_dir, "metrics.json")
     with open(out_path, "w", encoding="utf-8") as f:
-        json.dump(metrics, f, indent=4)
+        json.dump(metrics, f, indent=2)
 
-    print(f"[SELESAI] Val Acc: {val_acc:.4f} | F1-makro Val: {f1_val:.4f} | Test: {f1_test:.4f} -> {out_path}")
+    print(f"[SELESAI] Val Acc: {val_acc:.6f} | Val Macro F1: {f1_val:.6f} | Durasi: {durasi_detik}s -> {out_path}")
+
 
 if __name__ == "__main__":
     main()
