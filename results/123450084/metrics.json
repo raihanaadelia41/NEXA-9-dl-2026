@@ -4,7 +4,7 @@
     "val_macro_f1": 0.180556
   },
   "seed": 1,
-  "data_hash": "ISI_DENGAN_SHA256_LABEL_CSV",
+  "data_hash": "8af3bf9d38863c0733242e80e91301ee",
   "perangkat": "cpu laptop",
   "model": "Transformer",
   "n_val": 18,
