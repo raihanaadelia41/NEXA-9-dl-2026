@@ -49,29 +49,16 @@ lewat *pull request* ke `main`:
 Setelah *pull request* protokol digabung, `src/protokol/` tidak diubah lagi sampai akhir;
 perubahan hanya lewat *pull request* yang disetujui pembimbing.
 
-## Sprint 1 dan seterusnya: model tiap anggota
+## Sprint 1 : Tabel Komparasi Model Terhadap Data Primer
+## Reproduksi Demo Sprint 1
 
-1. Salin `models/TEMPLATE/` menjadi `models/<nim>/`, isi `run.py` sesuai `models/README.md`.
-2. Jalankan tiga seed pada konfigurasi akhir:
+Jalankan perintah berikut dari root repositori:
 
-   ```bash
-   python models/<nim>/run.py --seed 1 && python models/<nim>/run.py --seed 2 && python models/<nim>/run.py --seed 3
-   ```
-
-   Setiap run menulis `results/<nim>/metrics.json` lewat `src.common.evaluate`; Local Runner
-   memeriksanya (skema `metrik/seed/data_hash`, isi sama dengan HEAD) saat *Periksa artefak*
-   ditekan di aplikasi DSWorkbench.
-3. Perintah reproduksi tim (dinilai pada sprint terakhir): `python run_all.py`.
-
-## Yang dibakukan untuk semua tim
-
-- Split latih/validasi beku dari data latih dengan seed 2026 (`src/common/split.py`); data uji
-  hanya dievaluasi **sekali** oleh Penjaga Data pada sprint terakhir (`--final`).
-- Metrik: klasifikasi → akurasi dan macro-F1; regresi → RMSE, MAE, R². Metrik utama ditulis di
-  `PROTOKOL.md`. Hasil konfigurasi akhir dilaporkan sebagai rerata ± simpangan baku dari 3 seed.
-- Anggaran komputasi ≤ 20 menit pelatihan per run di CPU laptop (atau sesuai yang disetujui
-  pembimbing untuk kasus tim); catat `--durasi` dan `--perangkat`.
-- `data_hash` dihitung dari berkas di `data/MANIFEST.json` dan split; jangan diisi manual.
+```powershell
+pip install -r requirements.txt
+$env:PYTHONIOENCODING="utf-8"   # khusus Windows PowerShell
+python run_all.py --seeds 1
+```
 
 ## Jalur model
 

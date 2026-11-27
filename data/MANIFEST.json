@@ -1,5 +1,12 @@
 {
-  "sumber": "https://… (tautan dataset dari kartu Kasus tim di Workbench)",
-  "berkas": ["data/latih.csv"],
-  "catatan": "Isi pada Sprint 0: versi/tanggal unduh, jumlah baris, dan perubahan (bila ada). Berkas data sendiri tidak di-commit."
+  "sumber": "data primer tim 9 — Arah Gerak Keluar-Masuk di Depan Meja (rekam web 2026-11-17)",
+  "sesi": "tim09_web-20261117-171532-679f",
+  "arsip": "tim09_web-20261117-171532-679f.tar",
+  "tanggal": "2026-11-17",
+  "berkas": [
+    "data/sesi_tim09/digital.csv",
+    "data/sesi_tim09/label.csv",
+    "data/sesi_tim09/pose.csv"
+  ],
+  "catatan": "Data primer sesi meja Tim 9 - Arah Gerak (108 kondisi, P01-P06), tanggal rekam: 2026-11-17."
 }

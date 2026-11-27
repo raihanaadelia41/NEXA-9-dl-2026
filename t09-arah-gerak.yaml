@@ -1,0 +1,67 @@
+
+# Rencana eksperimen Tim 9
+# Arah Gerak Keluar-Masuk di Depan Meja
+
+tim: 9
+judul: Arah gerak keluar-masuk di depan meja
+pembimbing: Ahmad Luky Ramdani
+pilar: Gerak
+
+# Pengaturan pengacakan dan pengulangan
+seed: 1009
+ulangan: 3
+
+# Durasi setiap kondisi dan jeda perpindahan
+durasi_kondisi_detik: 8
+jeda_detik: 4
+
+# Pengaturan perangkat perekaman
+rekam:
+  audio:
+    aktif: false
+
+  kamera:
+    aktif: true
+    interval_detik: 0.1
+    lebar: 640
+    tinggi: 480
+
+# Faktor eksperimen
+faktor:
+  # Faktor manual: partisipan
+  partisipan:
+    jenis: manual
+    taraf:
+      - P01
+      - P02
+      - P03
+      - P04
+      - P05
+      - P06
+    instruksi: "Partisipan {taraf} siap di posisi (formulir persetujuan sudah ditandatangani)"
+
+  # Faktor isyarat: jenis lintasan gerakan
+  lintasan:
+    jenis: isyarat
+    taraf:
+      - masuk dari kiri
+      - keluar ke kiri
+      - masuk dari kanan
+      - keluar ke kanan
+      - melintas tanpa berhenti
+      - berhenti di meja
+    instruksi: "Lakukan: {taraf}"
+
+# Metode dan konfigurasi pemodelan
+metode:
+  jenis_tugas: Klasifikasi 6 lintasan
+  masukan_model: Urutan pose + PIR + sensor pintu
+  metrik_utama: F1-makro
+
+  jalur:
+    - CNN
+    - RNN
+    - Transformer
+    - AE
+
+  pembanding_non_dl: "Statistik sudut sendi dan kecepatan titik pose + Random Forest"
