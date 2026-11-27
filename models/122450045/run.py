@@ -205,6 +205,7 @@ def latih_dan_prediksi(
     final: bool,
     device: "torch.device",
     pooling: str,
+    simulasi: bool = False,
 ) -> tuple[np.ndarray, np.ndarray | None]:
     """Melatih BiGRU pada split latih dan menghasilkan prediksi validasi (serta uji bila final)."""
     import torch
@@ -218,7 +219,13 @@ def latih_dan_prediksi(
         torch.cuda.manual_seed_all(seed)
 
     # 2. Muat data resmi dari protokol tim
-    Xtr, ytr, Xva, yva, Xte, _ = data.muat()
+    if simulasi:
+        print("[MODE] Menggunakan data simulasi.")
+        Xtr, ytr, Xva, yva, Xte, _ = data.muat(
+            sesi_dir="data/__paksa_mode_simulasi__"
+        )
+    else:
+        Xtr, ytr, Xva, yva, Xte, _ = data.muat()
 
     X_train = _validasi_dan_tensor_fitur(Xtr)
     input_dim = X_train.shape[-1]
@@ -311,6 +318,7 @@ def main() -> None:
     )
     parser.add_argument("--seed", type=int, required=True, help="Seed pengacakan (mis. 1, 2, 3)")
     parser.add_argument("--final", action="store_true", help="Evaluasi data uji sekali pada sprint terakhir")
+    parser.add_argument("--simulasi", action="store_true", help="Gunakan data simulasi untuk uji kerangka")
     parser.add_argument(
         "--pooling",
         choices=["mean", "mean_hidden"],
@@ -332,6 +340,7 @@ def main() -> None:
         final=args.final,
         device=device,
         pooling=args.pooling,
+        simulasi=args.simulasi,
     )
     durasi = time.time() - t0
 
@@ -340,6 +349,14 @@ def main() -> None:
 
     out_dir = AKAR / "results" / NIM
     out_dir.mkdir(parents=True, exist_ok=True)
+
+    if args.simulasi:
+        path_pred_val = out_dir / f"pred_val_simulasi_{args.pooling}_seed{args.seed}.npy"
+        np.save(path_pred_val, np.asarray(pred_val, dtype=np.int64))
+        print("[SIMULASI] Training kerangka selesai.")
+        print("[SIMULASI] Evaluator resmi dilewati; tidak membuat metrics.json.")
+        print(f"[SIMULASI] Prediksi tersimpan: {path_pred_val.relative_to(AKAR)}")
+        return
 
     path_pred_val = out_dir / f"pred_val_{args.pooling}.npy"
     np.save(path_pred_val, np.asarray(pred_val, dtype=np.int64))
@@ -367,8 +384,6 @@ def main() -> None:
         np.save(path_pred_test, np.asarray(pred_test, dtype=np.int64))
         perintah += ["--pred-test", str(path_pred_test)]
 
-    # Evaluator resmi menulis metrics.json pada lokasi tetap. Simpan hasil
-    # eksperimen dengan nama pooling dan pulihkan metrics.json sebelumnya.
     path_metrics = out_dir / "metrics.json"
     previous_metrics = path_metrics.read_bytes() if path_metrics.exists() else None
 
