@@ -4,10 +4,10 @@
     "val_macro_f1": 0.180556
   },
   "seed": 1,
-  "data_hash": "8af3bf9d38863c0733242e80e91301ee",
+  "data_hash": "54437b452db63f6a159f84e04fce1283",
   "perangkat": "cpu laptop",
-  "model": "Transformer",
+  "model": "trf",
   "n_val": 18,
-  "n_test": 18,
-  "durasi_detik": 13.9
+  "n_test": 0,
+  "durasi_detik": 10.4
 }

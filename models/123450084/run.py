@@ -1,13 +1,12 @@
 import os
 import sys
-import json
+import subprocess
 import time
 import argparse
 import numpy as np
 import torch
 import torch.nn as nn
 from torch.utils.data import TensorDataset, DataLoader
-from sklearn.metrics import f1_score, accuracy_score
 
 # Tambahkan root repo ke sys.path agar src.protokol.data bisa diimpor
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
@@ -53,10 +52,12 @@ def main():
     t_mulai = time.time()
     parser = argparse.ArgumentParser()
     parser.add_argument("--seed", type=int, default=1)
+    parser.add_argument("--final", action="store_true", help="sprint terakhir: evaluasi data uji sekali")
     parser.add_argument("--sesi_dir", type=str, default="data/sesi_tim09")
     parser.add_argument("--epochs", type=int, default=25)
     parser.add_argument("--batch_size", type=int, default=16)
     parser.add_argument("--lr", type=float, default=1e-3)
+    parser.add_argument("--perangkat", type=str, default=None)
     args = parser.parse_args()
 
     set_seed(args.seed)
@@ -87,50 +88,42 @@ def main():
             loss.backward()
             optimizer.step()
 
-    # 4. Evaluasi F1-makro pada validasi & uji
+    # 4. Prediksi validasi (dan uji hanya jika --final)
     model.eval()
     with torch.no_grad():
         val_preds = model(torch.tensor(X_val).to(device)).argmax(dim=1).cpu().numpy()
-        test_preds = model(torch.tensor(X_test).to(device)).argmax(dim=1).cpu().numpy()
+        test_preds = (
+            model(torch.tensor(X_test).to(device)).argmax(dim=1).cpu().numpy()
+            if args.final and X_test is not None
+            else None
+        )
 
-    f1_val = float(f1_score(y_val, val_preds, average="macro"))
-    f1_test = float(f1_score(y_test, test_preds, average="macro"))
-    val_acc = float(accuracy_score(y_val, val_preds))
-
-    # 5. Baca data_hash dari MANIFEST.json jika ada
-    data_hash = "ISI_DENGAN_SHA256_LABEL_CSV"
-    manifest_path = "data/MANIFEST.json"
-    if os.path.exists(manifest_path):
-        with open(manifest_path, "r", encoding="utf-8") as mf:
-            data_hash = json.load(mf).get("data_hash", data_hash)
-
-    # 6. Simpan results/123450084/metrics.json
+    # 5. Simpan pred_val.npy dan evaluasi lewat evaluator tim (src.common.evaluate)
     durasi_detik = round(time.time() - t_mulai, 1)
-    perangkat = "cuda" if torch.cuda.is_available() else "cpu laptop"
+    perangkat = args.perangkat or ("cuda" if torch.cuda.is_available() else "cpu laptop")
 
+    akar = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
     nim = "123450084"
-    out_dir = os.path.join("results", nim)
+    out_dir = os.path.join(akar, "results", nim)
     os.makedirs(out_dir, exist_ok=True)
+    pred_val_path = os.path.join(out_dir, "pred_val.npy")
+    np.save(pred_val_path, np.asarray(val_preds))
 
-    metrics = {
-        "metrik": {
-            "val_acc": round(val_acc, 6),
-            "val_macro_f1": round(f1_val, 6),
-        },
-        "seed": args.seed,
-        "data_hash": data_hash,
-        "perangkat": perangkat,
-        "model": "Transformer",  # ganti jadi "tl" kalau memang diminta kode "tl"
-        "n_val": int(len(y_val)),
-        "n_test": int(len(y_test)),
-        "durasi_detik": durasi_detik,
-    }
+    perintah = [
+        sys.executable, "-m", "src.common.evaluate",
+        "--nim", nim,
+        "--model", "trf",
+        "--seed", str(args.seed),
+        "--pred-val", pred_val_path,
+        "--durasi", f"{durasi_detik:.1f}",
+        "--perangkat", perangkat,
+    ]
+    if test_preds is not None:
+        pred_test_path = os.path.join(out_dir, "pred_test.npy")
+        np.save(pred_test_path, np.asarray(test_preds))
+        perintah += ["--pred-test", pred_test_path]
 
-    out_path = os.path.join(out_dir, "metrics.json")
-    with open(out_path, "w", encoding="utf-8") as f:
-        json.dump(metrics, f, indent=2)
-
-    print(f"[SELESAI] Val Acc: {val_acc:.6f} | Val Macro F1: {f1_val:.6f} | Durasi: {durasi_detik}s -> {out_path}")
+    subprocess.run(perintah, check=True, cwd=akar)
 
 
 if __name__ == "__main__":
