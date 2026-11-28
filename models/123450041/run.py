@@ -180,6 +180,11 @@ def latih_dan_prediksi(
     # --------------------------------------------------------
 
     Xtr, ytr, Xva, _, Xte, _ = data.muat()
+    print("\n=== PEMERIKSAAN DATA ===")
+    print("X_train:", Xtr.shape)
+    print("y_train:", ytr.shape)
+    print("X_val  :", Xva.shape)
+    print("X_test :", Xte.shape)
 
     X_train = ke_tensor(Xtr, torch).to(device)
     X_val = ke_tensor(Xva, torch).to(device)
@@ -296,6 +301,9 @@ def latih_dan_prediksi(
     with torch.no_grad():
 
         output_val = model(X_val)
+        print("\n=== PEMERIKSAAN OUTPUT CNN ===")
+        print("Bentuk input CNN :", tuple(X_val.shape))
+        print("Bentuk output CNN:", tuple(output_val.shape))
 
         pred_val = (
             output_val.argmax(dim=1)
