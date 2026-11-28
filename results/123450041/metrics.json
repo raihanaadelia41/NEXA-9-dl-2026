@@ -9,5 +9,5 @@
   "model": "cnn",
   "n_val": 18,
   "n_test": 0,
-  "durasi_detik": 16.0
+  "durasi_detik": 9.3
 }
